@@ -58,6 +58,9 @@ S16.Engine = (() => {
 
   function styleEdge(myStyle, foeStyle) {
     if (!myStyle || !foeStyle) return 1;
+    const ns = S16.normalizeStyle || ((s) => s);
+    myStyle = ns(myStyle);
+    foeStyle = ns(foeStyle);
     const counter = S16.STYLE_COUNTER || {};
     if (counter[myStyle] === foeStyle) return 1.08;
     if (counter[foeStyle] === myStyle) return 0.93;
@@ -77,6 +80,8 @@ S16.Engine = (() => {
   }
 
   function styleEventWeight(style, evId) {
+    const ns = S16.normalizeStyle || ((s) => s);
+    style = ns(style);
     const w = {
       engage: { invade: 0.35, ambush: 0.2, lane: -0.1, rush: 0.3, wrap: 0.15, camp: -0.05 },
       protect: { invade: -0.15, ambush: 0.1, lane: 0.35, rush: -0.05, wrap: -0.1, camp: 0.3 },
@@ -173,15 +178,20 @@ S16.Engine = (() => {
     const rRoster = (redTeam.roster || []).slice();
     const deathsB = new Set();
     const deathsR = new Set();
+    // each player dies at most once — cap kills by living victims
+    const cappedB = Math.min(Math.max(0, killsB), rRoster.length);
+    const cappedR = Math.min(Math.max(0, killsR), bRoster.length);
 
-    const total = killsB + killsR;
-    for (let i = 0; i < total; i++) {
-      const killerIsBlue = killsB > 0 && (killsR === 0 || Math.random() < killsB / (killsB + killsR));
+    let leftB = cappedB;
+    let leftR = cappedR;
+    while (leftB > 0 || leftR > 0) {
+      const killerIsBlue = leftB > 0 && (leftR === 0 || Math.random() < leftB / (leftB + leftR));
       if (killerIsBlue) {
-        const killer = pick(bRoster.filter((p) => !deathsR.has(p.name + ":b") ));
-        // victim from red, prefer not already dead more than once conceptually
+        const aliveKillers = bRoster.filter((p) => !deathsB.has(p.name));
+        const killer = aliveKillers.length ? pick(aliveKillers) : pick(bRoster);
         const aliveR = rRoster.filter((p) => !deathsR.has(p.name));
-        const victim = aliveR.length ? pick(aliveR) : pick(rRoster);
+        if (!aliveR.length) break;
+        const victim = pick(aliveR);
         deathsR.add(victim.name);
         feed.push({
           type: "kill",
@@ -195,10 +205,13 @@ S16.Engine = (() => {
           victimTeamId: redTeam.id,
           text: `${killer.name}（${killer.posCn || killer.pos}）击杀了 ${victim.name}（${victim.posCn || victim.pos}）`,
         });
+        leftB -= 1;
       } else {
-        const killer = pick(rRoster);
+        const aliveKillers = rRoster.filter((p) => !deathsR.has(p.name));
+        const killer = aliveKillers.length ? pick(aliveKillers) : pick(rRoster);
         const aliveB = bRoster.filter((p) => !deathsB.has(p.name));
-        const victim = aliveB.length ? pick(aliveB) : pick(bRoster);
+        if (!aliveB.length) break;
+        const victim = pick(aliveB);
         deathsB.add(victim.name);
         feed.push({
           type: "kill",
@@ -212,6 +225,7 @@ S16.Engine = (() => {
           victimTeamId: blueTeam.id,
           text: `${killer.name}（${killer.posCn || killer.pos}）击杀了 ${victim.name}（${victim.posCn || victim.pos}）`,
         });
+        leftR -= 1;
       }
     }
     return feed;
@@ -249,10 +263,17 @@ S16.Engine = (() => {
 
     const winner = finalB >= finalR ? "blue" : "red";
     const killFeed = buildKillFeed(blue, red, killsB, killsR);
+    // align reported kills with unique deaths in feed
+    let reportedB = 0;
+    let reportedR = 0;
+    for (const ev of killFeed) {
+      if (ev.killerTeamId === blue.id) reportedB += 1;
+      else reportedR += 1;
+    }
     return {
       winner,
-      killsB,
-      killsR,
+      killsB: reportedB,
+      killsR: reportedR,
       finalB,
       finalR,
       skillB: castB,
@@ -451,7 +472,7 @@ S16.Engine = (() => {
     let marginKey = "close";
     if (margin > 0.28) marginKey = "crush";
     else if (margin > 0.12) marginKey = "solid";
-    else if (margin < 0.05) marginKey = "comeback";
+    else if (margin <= 0.05) marginKey = "close";
 
     return {
       rounds,

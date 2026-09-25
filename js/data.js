@@ -136,7 +136,23 @@ S16.MARGIN_TEXT = {
   crush: "碾压",
   solid: "稳健",
   close: "胶着",
-  comeback: "翻盘",
+  comeback: "险胜",
+};
+
+/** 把非标准 style 映射进四风格克制环 */
+S16.normalizeStyle = function normalizeStyle(style) {
+  const ring = ["engage", "protect", "split", "teamfight"];
+  if (ring.includes(style)) return style;
+  const alias = {
+    gadget: "split",
+    offmeta: "split",
+    "protect-c": "protect",
+    "bot-agro": "engage",
+    "top-drive": "engage",
+    "mid-carry": "teamfight",
+    "split-push": "split",
+  };
+  return alias[style] || "teamfight";
 };
 
 /** 生成后由 applyRoster 合并；此处仅作文案/默认值 */
@@ -149,6 +165,7 @@ S16.applyRoster = function applyRoster() {
     return {
       ...t,
       power,
+      style: S16.normalizeStyle(t.style),
       radarPower: t.radarPower,
       roster: t.roster || [],
       teamRadar: t.teamRadar || {},

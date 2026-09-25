@@ -1305,7 +1305,7 @@ S16.ROSTER = [
     "short": "C9",
     "region": "LCS",
     "power": 89.1,
-    "style": "gadget",
+    "style": "split",
     "signature": "offmeta",
     "heroes": [
       "吉格斯",
@@ -1449,7 +1449,7 @@ S16.ROSTER = [
     "short": "G2",
     "region": "LEC",
     "power": 86.1,
-    "style": "gadget",
+    "style": "split",
     "signature": "offmeta",
     "heroes": [
       "吉格斯",

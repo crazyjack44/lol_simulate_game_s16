@@ -88,7 +88,7 @@ S16.TeamfightAnim = class TeamfightAnim {
     return units;
   }
 
-  _loop = () => {
+  _loop() {
     if (!this.running) return;
     const now = performance.now();
     const t = now - this.t0;
@@ -99,8 +99,8 @@ S16.TeamfightAnim = class TeamfightAnim {
       if (this.onDone) this.onDone();
       return;
     }
-    this.raf = requestAnimationFrame(this._loop);
-  };
+    this.raf = requestAnimationFrame(() => this._loop());
+  }
 
   _update(t, now) {
     // movement toward targets

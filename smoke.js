@@ -109,9 +109,36 @@ const fight = S16.Engine.simulateTeamfight({
 });
 ok(Array.isArray(fight.killFeed) && fight.killFeed.length >= 1, "killFeed non-empty");
 const victims = fight.killFeed.map((k) => k.victim);
-// at most 5 unique deaths per side; allow repeated names across sides only
-ok(new Set(victims).size >= Math.min(2, victims.length), "killFeed has victims");
+ok(new Set(victims).size === victims.length, "killFeed victims are unique, got " + victims.join(","));
 ok(fight.killFeed.every((k) => k.killer && k.victim && k.text), "killFeed fields");
+// simulate many fights — no duplicate deaths ever
+let dup = 0;
+for (let i = 0; i < 200; i++) {
+  const f = S16.Engine.simulateTeamfight({
+    blue,
+    red,
+    bluePower: 85,
+    redPower: 84,
+    ecoB: 1,
+    ecoR: 1,
+    styleEdgeB: 1,
+    styleEdgeR: 1,
+    edgeB: 1,
+    edgeR: 1,
+    objective: "baron",
+  });
+  const vs = f.killFeed.map((k) => k.victim);
+  if (new Set(vs).size !== vs.length) dup++;
+}
+ok(dup === 0, "200 teamfights have unique victims (dups=" + dup + ")");
+
+// style ring membership
+ok(S16.Engine.styleEdge("gadget", "protect") !== undefined, "gadget styleEdge works");
+ok(S16.normalizeStyle("gadget") === "split", "gadget normalizes into ring");
+const g2 = S16.TEAMS.find((t) => t.id === "G2");
+const c9 = S16.TEAMS.find((t) => t.id === "C9");
+ok(["engage", "protect", "split", "teamfight"].includes(g2.style), "G2 style in ring: " + g2.style);
+ok(["engage", "protect", "split", "teamfight"].includes(c9.style), "C9 style in ring: " + c9.style);
 
 // drawGroupStage
 const groups = S16.Engine.drawGroupStage(S16.TEAMS);

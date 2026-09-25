@@ -439,9 +439,9 @@ S16.Game = (() => {
     const result = S16.Engine.simulateMatch({
       blue,
       red,
-      blueLineup: myIsBlue ? state.prep.lineup : S16.Engine.autoLineup(red),
+      blueLineup: myIsBlue ? state.prep.lineup : S16.Engine.autoLineup(blue),
       redLineup: myIsBlue ? S16.Engine.autoLineup(red) : state.prep.lineup,
-      blueStyle: myIsBlue ? state.prep.style : (red.style || S16.Engine.autoPicks(red).style),
+      blueStyle: myIsBlue ? state.prep.style : (blue.style || S16.Engine.autoPicks(blue).style),
       redStyle: myIsBlue ? (red.style || S16.Engine.autoPicks(red).style) : state.prep.style,
     });
     state._pendingResult = result;
