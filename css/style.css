@@ -1,4 +1,10 @@
-/* S16 Worlds Strategy Clash — design tokens & layout */
+/* LPL 比分字体（本地离线） */
+@font-face {
+  font-family: "Knucklehead";
+  src: url("../assets/fonts/font-knucklehead.ttf") format("truetype");
+  font-display: swap;
+}
+
 :root {
   --bg: #0b0e14;
   --panel: #151c28;
@@ -480,8 +486,10 @@ img {
 
 .match-score {
   margin: 6px 0;
-  color: var(--muted);
-  font-size: 12px;
+  color: var(--gold-hi);
+  font-family: "Knucklehead", "Segoe UI", sans-serif;
+  font-size: 18px;
+  letter-spacing: 0.04em;
 }
 
 .standings-row {
@@ -497,6 +505,11 @@ img {
   color: var(--muted);
   font-size: 11px;
   letter-spacing: 0.08em;
+}
+
+.name-defeated {
+  color: #7a8496 !important;
+  opacity: 0.72;
 }
 
 .standings-row.me {
@@ -733,6 +746,129 @@ img {
   color: var(--gold);
 }
 
+.log-line.commentary {
+  display: none;
+}
+
+.commentary-box {
+  margin-top: 10px;
+  max-height: 120px;
+  overflow: auto;
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(180, 120, 255, 0.22);
+  background: rgba(180, 120, 255, 0.06);
+  font-size: 13px;
+}
+
+.commentary-box:empty {
+  display: none;
+}
+
+.commentary-line {
+  color: #d4b8ff;
+  font-style: italic;
+  padding: 4px 2px;
+  border-left: 2px solid rgba(180, 120, 255, 0.45);
+  padding-left: 8px;
+  margin-bottom: 6px;
+}
+
+.buff-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin: 2px 4px 2px 0;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  color: var(--buff, var(--gold));
+  background: color-mix(in srgb, var(--buff, #c8aa6e) 22%, transparent);
+  border: 1px solid color-mix(in srgb, var(--buff, #c8aa6e) 45%, transparent);
+}
+
+.bo1-score-banner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+  margin: 0 0 14px;
+  padding: 16px 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  background:
+    linear-gradient(135deg, rgba(200, 170, 110, 0.16), rgba(21, 28, 40, 0.92));
+  box-shadow: var(--shadow);
+}
+
+.bo1-score-banner[hidden] {
+  display: none !important;
+}
+
+.bo1-score-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 120px;
+}
+
+.bo1-score-side img {
+  width: 56px;
+  height: 56px;
+  object-fit: contain;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.bo1-score-side .bo1-score-name {
+  font-size: 13px;
+  color: var(--muted);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bo1-score-num {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  line-height: 1;
+}
+
+.bo1-score-num.win {
+  color: var(--gold-hi);
+}
+
+.bo1-score-num.lose {
+  color: var(--muted);
+}
+
+.bo1-score-mid {
+  text-align: center;
+}
+
+.bo1-score-main {
+  font-family: "Knucklehead", "Segoe UI", sans-serif;
+  font-size: 56px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--gold-hi);
+  line-height: 1;
+}
+
+.bo1-score-num {
+  font-family: "Knucklehead", "Segoe UI", sans-serif;
+}
+
+.bo1-score-sub {
+  margin-top: 4px;
+  color: var(--gold);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+}
+
 /* result / champion */
 .result-banner {
   padding: 24px;
@@ -756,6 +892,7 @@ img {
   letter-spacing: 0.14em;
   font-size: 12px;
   text-transform: uppercase;
+  font-family: "Knucklehead", "Segoe UI", sans-serif;
 }
 
 .stat-row {

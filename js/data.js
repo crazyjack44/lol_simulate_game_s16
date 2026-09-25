@@ -105,6 +105,43 @@ S16.HERO_SKILLS = {
   harvest: { id: "harvest", name: "对线收割", icon: "🗡", mult: 1.04, when: "对线收割" },
 };
 
+/** 电竞梗/解说桥段：{p1} {p2} {team} {foe} {obj} —— 低频触发 */
+S16.COMMENTARY = {
+  engage: [
+    "但是{p1}被定住了，追击有点难……",
+    "{p1}天神下凡一锤四！这波直接扭转了局势！",
+    "走位，{p1}！这都能开起来？",
+    "{team}这波开团，像极了当年那个名场面。",
+  ],
+  steal: [
+    "{p1}抢到了{obj}！那么局势要向{team}倾斜了……",
+    "惩戒！{p1}抢到了！我的天！",
+    "{obj}被{team}偷了，{foe}的节奏全乱了。",
+  ],
+  turn: [
+    "{p1}扭转了局势！{team}这波打回来了！",
+    "等等，{p1}还在操作！残血反杀不是梦！",
+    "局势两极反转，{foe}前面的优势呢？",
+  ],
+  wipe: [
+    "{team}一波带走！对面直接被团灭了！",
+    "这就是运营吗？{foe}全员倒下，比赛悬念结束。",
+    "打得好啊{team}！这局是他们的！",
+  ],
+  buff: [
+    "拿下{obj}，{team}接下来要发力了。",
+    "{obj}到手，地图上的声音都是{team}的。",
+  ],
+  misc: [
+    "这波啊，这波是肉蛋葱鸡。",
+    "这运营，有点像在下棋。",
+    "懂的都懂，不懂的我也不多说了。",
+    "你有什么头绪吗，{p1}？",
+    "先相信，再质疑——哦现在可以相信了。",
+    "一波一波，慢慢来，别急。",
+  ],
+};
+
 S16.NARRATIVE = {
   invade: [
     "{team} 三人抱团入侵 {objective}，{player} 走在最前。",
@@ -137,6 +174,47 @@ S16.MARGIN_TEXT = {
   solid: "稳健",
   close: "胶着",
   comeback: "险胜",
+};
+
+/** 对局规则：每人复活 2 次（共 3 命）；一方全员阵亡则该局结束；赛事 BO5（先胜 3） */
+S16.RULES = {
+  revivesPerPlayer: 2,
+  livesPerPlayer: 3, // 1 + revives
+  teamSize: 5,
+  series: "BO5",
+  seriesWinsNeeded: 3,
+  animateGames: 1, // 动画只播 1 局 BO1
+};
+
+/** 资源团胜方增益（用图标/颜色表示） */
+S16.BUFFS = {
+  dragon: {
+    id: "dragon",
+    name: "小龙增益",
+    icon: "🐉",
+    color: "#4a9eff",
+    desc: "小龙团胜方 · 伤害 +8%",
+    dmg: 1.08,
+    eco: 1.02,
+  },
+  baron: {
+    id: "baron",
+    name: "大龙增益",
+    icon: "👑",
+    color: "#c868ff",
+    desc: "大龙团胜方 · 伤害 +12% / 经济 +5%",
+    dmg: 1.12,
+    eco: 1.05,
+  },
+  elder: {
+    id: "elder",
+    name: "龙魂",
+    icon: "✨",
+    color: "#f0d27a",
+    desc: "双龙会 · 伤害 +15%",
+    dmg: 1.15,
+    eco: 1.06,
+  },
 };
 
 /** 把非标准 style 映射进四风格克制环 */

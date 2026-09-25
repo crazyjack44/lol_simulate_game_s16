@@ -172,63 +172,100 @@ S16.Engine = (() => {
     return { skill, mult, when: whenMap[phase] || skill.when || "自动" };
   }
 
-  function buildKillFeed(blueTeam, redTeam, killsB, killsR) {
-    const feed = [];
-    const bRoster = (blueTeam.roster || []).slice();
-    const rRoster = (redTeam.roster || []).slice();
-    const deathsB = new Set();
-    const deathsR = new Set();
-    // each player dies at most once — cap kills by living victims
-    const cappedB = Math.min(Math.max(0, killsB), rRoster.length);
-    const cappedR = Math.min(Math.max(0, killsR), bRoster.length);
+  function rules() {
+    return (S16.RULES || {
+      revivesPerPlayer: 2,
+      livesPerPlayer: 3,
+      teamSize: 5,
+      seriesWinsNeeded: 3,
+    });
+  }
 
-    let leftB = cappedB;
-    let leftR = cappedR;
-    while (leftB > 0 || leftR > 0) {
-      const killerIsBlue = leftB > 0 && (leftR === 0 || Math.random() < leftB / (leftB + leftR));
-      if (killerIsBlue) {
-        const aliveKillers = bRoster.filter((p) => !deathsB.has(p.name));
-        const killer = aliveKillers.length ? pick(aliveKillers) : pick(bRoster);
-        const aliveR = rRoster.filter((p) => !deathsR.has(p.name));
-        if (!aliveR.length) break;
-        const victim = pick(aliveR);
-        deathsR.add(victim.name);
-        feed.push({
-          type: "kill",
-          killer: killer.name,
-          killerPos: killer.posCn || killer.pos,
-          killerTeam: blueTeam.short || blueTeam.name,
-          killerTeamId: blueTeam.id,
-          victim: victim.name,
-          victimPos: victim.posCn || victim.pos,
-          victimTeam: redTeam.short || redTeam.name,
-          victimTeamId: redTeam.id,
-          text: `${killer.name}（${killer.posCn || killer.pos}）击杀了 ${victim.name}（${victim.posCn || victim.pos}）`,
-        });
-        leftB -= 1;
-      } else {
-        const aliveKillers = rRoster.filter((p) => !deathsR.has(p.name));
-        const killer = aliveKillers.length ? pick(aliveKillers) : pick(rRoster);
-        const aliveB = bRoster.filter((p) => !deathsB.has(p.name));
-        if (!aliveB.length) break;
-        const victim = pick(aliveB);
-        deathsB.add(victim.name);
-        feed.push({
-          type: "kill",
-          killer: killer.name,
-          killerPos: killer.posCn || killer.pos,
-          killerTeam: redTeam.short || redTeam.name,
-          killerTeamId: redTeam.id,
-          victim: victim.name,
-          victimPos: victim.posCn || victim.pos,
-          victimTeam: blueTeam.short || blueTeam.name,
-          victimTeamId: blueTeam.id,
-          text: `${killer.name}（${killer.posCn || killer.pos}）击杀了 ${victim.name}（${victim.posCn || victim.pos}）`,
-        });
-        leftR -= 1;
-      }
+  /**
+   * Fight until one team is fully wiped (all players use up every life).
+   * Each player has `revivesPerPlayer` revives (lives = 1 + revives).
+   * Winner = side that still has living members.
+   */
+  function buildKillFeedUntilWipe(blueTeam, redTeam, powerRatioBlue /* 0..1 */) {
+    const R = rules();
+    const bRoster = (blueTeam.roster || []).slice(0, R.teamSize);
+    const rRoster = (redTeam.roster || []).slice(0, R.teamSize);
+    const livesB = bRoster.map(() => R.livesPerPlayer);
+    const livesR = rRoster.map(() => R.livesPerPlayer);
+    const feed = [];
+
+    const aliveB = () => livesB.some((n) => n > 0);
+    const aliveR = () => livesR.some((n) => n > 0);
+    const pickAlive = (roster, lives) => {
+      const idx = [];
+      for (let i = 0; i < roster.length; i++) if (lives[i] > 0) idx.push(i);
+      return idx.length ? idx[Math.floor(Math.random() * idx.length)] : -1;
+    };
+
+    let guard = 0;
+    while (aliveB() && aliveR() && guard < 80) {
+      guard++;
+      // attacker side biased by power
+      const blueScores = Math.random() < powerRatioBlue;
+      const killerSide = blueScores ? "blue" : "red";
+      const kRoster = killerSide === "blue" ? bRoster : rRoster;
+      const kLives = killerSide === "blue" ? livesB : livesR;
+      const vRoster = killerSide === "blue" ? rRoster : bRoster;
+      const vLives = killerSide === "blue" ? livesR : livesB;
+
+      const ki = pickAlive(kRoster, kLives);
+      const vi = pickAlive(vRoster, vLives);
+      if (ki < 0 || vi < 0) break;
+      const killer = kRoster[ki];
+      const victim = vRoster[vi];
+      vLives[vi] -= 1;
+      const revivesLeft = Math.max(0, vLives[vi]);
+
+      feed.push({
+        type: "kill",
+        killer: killer.name,
+        killerPos: killer.posCn || killer.pos,
+        killerTeam: (killerSide === "blue" ? blueTeam : redTeam).short || (killerSide === "blue" ? blueTeam : redTeam).name,
+        killerTeamId: killerSide === "blue" ? blueTeam.id : redTeam.id,
+        victim: victim.name,
+        victimPos: victim.posCn || victim.pos,
+        victimTeam: (killerSide === "blue" ? redTeam : blueTeam).short || (killerSide === "blue" ? redTeam : blueTeam).name,
+        victimTeamId: killerSide === "blue" ? redTeam.id : blueTeam.id,
+        text: `${killer.name}（${killer.posCn || killer.pos}）击杀了 ${victim.name}（${victim.posCn || victim.pos}）`,
+        victimRevivesLeft: revivesLeft,
+        finalDeath: revivesLeft === 0 && !vLives.some((n) => n > 0),
+      });
     }
-    return feed;
+
+    // 胜者 = 仍有存活名额的一方；一方被团灭则另一方获胜（与动画一致）
+    const blueWiped = !livesB.some((n) => n > 0);
+    const redWiped = !livesR.some((n) => n > 0);
+    let winner;
+    if (blueWiped && !redWiped) winner = "red";
+    else if (redWiped && !blueWiped) winner = "blue";
+    else if (blueWiped && redWiped) winner = powerRatioBlue >= 0.5 ? "blue" : "red";
+    else winner = powerRatioBlue >= 0.5 ? "blue" : "red"; // 超时未分完
+    const wiped = winner === "blue" ? "red" : "blue";
+    const winnerTeamId = winner === "blue" ? blueTeam.id : redTeam.id;
+    const wipedTeamId = winner === "blue" ? redTeam.id : blueTeam.id;
+    const killsB = feed.filter((e) => e.killerTeamId === blueTeam.id).length;
+    const killsR = feed.filter((e) => e.killerTeamId === redTeam.id).length;
+    return {
+      feed,
+      winner,
+      winnerTeamId,
+      wipedTeamId,
+      killsB,
+      killsR,
+      wiped,
+      blueWiped,
+      redWiped,
+    };
+  }
+
+  /** Keep name for API compatibility — now full wipe fight */
+  function buildKillFeed(blueTeam, redTeam, powerRatioBlue = 0.5) {
+    return buildKillFeedUntilWipe(blueTeam, redTeam, powerRatioBlue).feed;
   }
 
   function simulateTeamfight(input) {
@@ -253,25 +290,46 @@ S16.Engine = (() => {
 
     const finalB = bluePower * ecoB * styleEdgeB * edgeB * castB.mult * rand(0.97, 1.03);
     const finalR = redPower * ecoR * styleEdgeR * edgeR * castR.mult * rand(0.97, 1.03);
-    const ratio = finalB / (finalB + finalR);
-    const totalKills = 3 + Math.floor(rand(0, 7));
-    let killsB = Math.round(totalKills * ratio);
-    let killsR = totalKills - killsB;
-    // clamp
-    killsB = clamp(0, totalKills, killsB);
-    killsR = totalKills - killsB;
+    const powerRatioBlue = finalB / (finalB + finalR);
 
-    const winner = finalB >= finalR ? "blue" : "red";
-    const killFeed = buildKillFeed(blue, red, killsB, killsR);
-    // align reported kills with unique deaths in feed
-    let reportedB = 0;
-    let reportedR = 0;
-    for (const ev of killFeed) {
-      if (ev.killerTeamId === blue.id) reportedB += 1;
-      else reportedR += 1;
+    const wipe = buildKillFeedUntilWipe(blue, red, powerRatioBlue);
+    const killFeed = wipe.feed;
+    const reportedB = wipe.killsB;
+    const reportedR = wipe.killsR;
+    const winner = wipe.winner;
+
+    // 对战中途随机发资源 buff：概率由战队战力决定（不与胜负绑定）
+    function rollBuff(kind) {
+      const powB = Math.max(1, bluePower * styleEdgeB * edgeB);
+      const powR = Math.max(1, redPower * styleEdgeR * edgeR);
+      let pBlue = powB / (powB + powR);
+      pBlue = 0.15 + pBlue * 0.7;
+      const buffWinner = Math.random() < pBlue ? "blue" : "red";
+      const base = (S16.BUFFS && S16.BUFFS[kind]) || {};
+      return {
+        id: kind,
+        name: kind === "baron" ? (base.name || "大龙增益") : (base.name || "小龙增益"),
+        icon: kind === "baron" ? (base.icon || "👑") : (base.icon || "🐉"),
+        color: kind === "baron" ? (base.color || "#c868ff") : (base.color || "#4a9eff"),
+        dmg: kind === "baron" ? (base.dmg || 1.12) : (base.dmg || 1.08),
+        eco: kind === "baron" ? (base.eco || 1.05) : (base.eco || 1.02),
+        winner: buffWinner,
+        randomBy: "teamPower",
+        pBlue: Number(pBlue.toFixed(3)),
+      };
     }
+
+    // 中途节点：40% 进度出小龙，70% 进度出大龙（并非只有大龙）
+    const timelineBuffs = [
+      { at: 0.38, buff: rollBuff("dragon") },
+      { at: 0.68, buff: rollBuff("baron") },
+    ];
+    const buff = timelineBuffs[0].buff; // 兼容字段
+
     return {
       winner,
+      winnerTeamId: wipe.winnerTeamId,
+      wipedTeamId: wipe.wipedTeamId,
       killsB: reportedB,
       killsR: reportedR,
       finalB,
@@ -280,6 +338,10 @@ S16.Engine = (() => {
       skillR: castR,
       objective,
       killFeed,
+      buff,
+      timelineBuffs,
+      wiped: wipe.wiped,
+      wipeEnd: true,
     };
   }
 
@@ -316,9 +378,8 @@ S16.Engine = (() => {
   }
 
   /**
-   * Full match simulation (no player event cards).
-   * input: { blue, red, blueLineup, redLineup, blueStyle, redStyle }
-   * returns rounds[] + stats
+   * One BO1 game: continuous engagement until one team is fully wiped.
+   * Still exposes prediction/phase beats for UI, but the game only ends on wipe.
    */
   function simulateMatch(input) {
     const blue = input.blue;
@@ -340,13 +401,35 @@ S16.Engine = (() => {
     let ecoR = 1;
     let lastB = null;
     let lastR = null;
-    let killsB = 0;
-    let killsR = 0;
-    let objsB = 0;
-    let objsR = 0;
     let hitsTop1 = 0;
     let preds = 0;
+    const buffsBlue = [];
+    const buffsRed = [];
 
+    // One wipe-based engagement is the whole game (BO1 shown in animation)
+    const castB = autoSkillCast(luB.skill, "baron");
+    const castR = autoSkillCast(luR.skill, "baron");
+    const finalB = baseB * ecoB * seB * castB.mult * rand(0.97, 1.03);
+    const finalR = baseR * ecoR * seR * castR.mult * rand(0.97, 1.03);
+    const powerRatioBlue = finalB / (finalB + finalR);
+    // 只模拟一次团灭战，动画/比分/胜负共用同一结果
+    const decisive = simulateTeamfight({
+      blue,
+      red,
+      bluePower: baseB,
+      redPower: baseR,
+      ecoB,
+      ecoR,
+      styleEdgeB: seB,
+      styleEdgeR: seR,
+      edgeB: 1,
+      edgeR: 1,
+      skillBlue: luB.skill,
+      skillRed: luR.skill,
+      objective: "baron",
+    });
+
+    // 阶段预测（供 UI）：三个节点都跑，但资源 buff 走时间轴中途结算
     const rounds = [];
     for (const phaseDef of S16.PHASES) {
       const ctx = {
@@ -395,49 +478,6 @@ S16.Engine = (() => {
         ecoR += (rEv.eco / 200) * 0.55;
       }
 
-      const ecoDiff = Math.abs(ecoB - ecoR);
-      let fight = null;
-      const isEarly = phaseDef.id === "early";
-      const sameId = bEv.id === rEv.id;
-      let force = false;
-      if (ecoDiff > 0.12 && Math.random() < 0.55) force = true;
-
-      const shouldFight =
-        force ||
-        (sameId && !isEarly) ||
-        (edge === "none" && !isEarly && Math.random() < 0.45) ||
-        (phaseDef.id === "baron" && Math.random() < 0.92) ||
-        (phaseDef.id === "dragon" && Math.random() < 0.55) ||
-        (isEarly && sameId && Math.random() < 0.35);
-
-      if (shouldFight) {
-        let edgeB = 1;
-        let edgeR = 1;
-        if (!force) {
-          if (edge === "a") edgeB = 1.12;
-          if (edge === "b") edgeR = 1.12;
-        }
-        fight = simulateTeamfight({
-          blue,
-          red,
-          bluePower: baseB,
-          redPower: baseR,
-          ecoB,
-          ecoR,
-          styleEdgeB: seB,
-          styleEdgeR: seR,
-          edgeB,
-          edgeR,
-          skillBlue: luB.skill,
-          skillRed: luR.skill,
-          objective: phaseDef.id === "early" ? "teamfight" : phaseDef.id,
-        });
-        killsB += fight.killsB;
-        killsR += fight.killsR;
-        if (fight.winner === "blue") objsB += phaseDef.id === "early" ? 0 : 1;
-        else objsR += phaseDef.id === "early" ? 0 : 1;
-      }
-
       lastB = bEv.id;
       lastR = rEv.id;
 
@@ -454,28 +494,48 @@ S16.Engine = (() => {
         predB: predB.slice(0, 3),
         predR: predR.slice(0, 3),
         edge,
-        force,
-        fight,
+        force: false,
+        fight: null,
         ecoB,
         ecoR,
         narrative,
       });
     }
 
-    // final score
-    const finalB = baseB * ecoB * seB * rand(0.97, 1.03) * (1 + killsB * 0.012);
-    const finalR = baseR * ecoR * seR * rand(0.97, 1.03) * (1 + killsR * 0.012);
-    const scoreB = finalB + killsB * 1.8 + objsB * 2.5;
-    const scoreR = finalR + killsR * 1.8 + objsR * 2.5;
-    const winner = scoreB >= scoreR ? "blue" : "red";
-    const margin = Math.abs(scoreB - scoreR) / Math.max(scoreB, scoreR, 1);
-    let marginKey = "close";
+    // attach as the last round's fight so UI plays one BO1 wipe battle
+    if (rounds.length) rounds[rounds.length - 1].fight = decisive;
+    // 资源 buff 进入整局累计（供赛果展示）
+    if (decisive.timelineBuffs) {
+      for (const t of decisive.timelineBuffs) {
+        if (!t || !t.buff) continue;
+        const bag = t.buff.winner === "blue" ? buffsBlue : buffsRed;
+        bag.push({ ...t.buff, side: t.buff.winner });
+      }
+    } else if (decisive.buff) {
+      const bag = decisive.buff.winner === "blue" ? buffsBlue : buffsRed;
+      bag.push({ ...decisive.buff, side: decisive.buff.winner });
+    }
+
+    const killsB = decisive.killsB;
+    const killsR = decisive.killsR;
+    const objsB = buffsBlue.length;
+    const objsR = buffsRed.length;
+    // 以团灭方向为准：赢家 = 未被团灭的一方
+    const gameWinner = decisive.winner;
+    const wipeTeam = decisive.wiped;
+    const winnerTeamId = decisive.winnerTeamId || (gameWinner === "blue" ? blue.id : red.id);
+    const loserTeamId = decisive.wipedTeamId || (gameWinner === "blue" ? red.id : blue.id);
+    const scoreB = winnerTeamId === blue.id ? 1 : 0;
+    const scoreR = winnerTeamId === red.id ? 1 : 0;
+    const margin = 1;
+    let marginKey = "crush";
     if (margin > 0.28) marginKey = "crush";
     else if (margin > 0.12) marginKey = "solid";
     else if (margin <= 0.05) marginKey = "close";
 
     return {
       rounds,
+      timelineBuffs: decisive.timelineBuffs || [],
       killsB,
       killsR,
       objsB,
@@ -484,7 +544,12 @@ S16.Engine = (() => {
       scoreR,
       finalB,
       finalR,
-      winner,
+      winner: gameWinner,
+      winnerTeamId,
+      loserTeamId,
+      wipeTeam,
+      wipeEnd: true,
+      mode: "BO1",
       margin,
       marginKey,
       marginText: (S16.MARGIN_TEXT && S16.MARGIN_TEXT[marginKey]) || marginKey,
@@ -492,7 +557,41 @@ S16.Engine = (() => {
       redLineup: luR,
       blueStyle,
       redStyle,
+      buffsBlue,
+      buffsRed,
       predHitRate: preds ? hitsTop1 / preds : 0,
+    };
+  }
+
+  /**
+   * BO5 series: first to 3 game wins. Animation typically shows only one game.
+   */
+  function simulateSeries(input) {
+    const R = rules();
+    const need = R.seriesWinsNeeded;
+    const games = [];
+    let winsB = 0;
+    let winsR = 0;
+    while (winsB < need && winsR < need && games.length < 5) {
+      const g = simulateMatch({
+        ...input,
+        blueLineup: input.blueLineup || autoLineup(input.blue),
+        redLineup: input.redLineup || autoLineup(input.red),
+      });
+      games.push(g);
+      if (g.winner === "blue") winsB += 1;
+      else winsR += 1;
+    }
+    const winner = winsB >= need ? "blue" : "red";
+    return {
+      mode: "BO5",
+      winsB,
+      winsR,
+      winner,
+      games,
+      // UI animates one BO1 only (first game of the series)
+      animatedGameIndex: 0,
+      animatedGame: games[0] || null,
     };
   }
 
@@ -507,7 +606,9 @@ S16.Engine = (() => {
     counterEdge,
     predictEvents,
     simulateMatch,
+    simulateSeries,
     simulateTeamfight,
+    buildKillFeedUntilWipe,
     autoSkillCast,
     buildKillFeed,
     autoPicks,

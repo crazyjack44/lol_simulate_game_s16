@@ -74,6 +74,47 @@ STATIC_POWER = {
     "LYON": 78, "FLY": 79, "SR": 77,
 }
 
+# 往年全球总决赛成绩校准（雷达维度与 power 同步偏移）
+# 强队增强、弱队削弱；幅度比「保守微调」更大，仍保留最新赛段主数据骨架
+WORLDS_PEDIGREE = {
+    "T1": 7.5,   # 多冠王朝 / 国际赛最稳
+    "GEN": 5.5,  # 近年 S 赛常客四强以上
+    "BLG": 5.0,  # 近年 S 赛决赛/四强
+    "DK": 4.0,   # 2020 冠军班底血统
+    "IG": 0.8,   # 2018 冠军是俱乐部血统；2026 重组阵容，不宜高估
+    "HLE": 3.5,  # LCK 强队国际赛竞争力
+    "G2": 4.2,   # 西方之光，MSI/决赛履历
+    "TES": 2.8,  # LPL 主力国际赛有来有回
+    "AL": 1.0,
+    "TL": 1.2,
+    "C9": 0.8,
+    "KC": 0.5,
+    "KOI": -0.8,
+    "FLY": -3.2,
+    "LYON": -4.2,
+    "SR": -4.8,
+}
+
+# 赛区整体强度系数（激进）：LCK > LPL > LEC > LCS
+# 对雷达维度与战力同时生效
+REGION_MULT = {
+    "LCK": 1.12,
+    "LPL": 1.06,
+    "LEC": 0.98,
+    "LCS": 0.88,
+}
+REGION_FLAT = {
+    "LCK": 5.0,
+    "LPL": 2.2,
+    "LEC": -0.3,
+    "LCS": -3.8,
+}
+# 北美强队可豁免大部分赛区削弱（保留国际赛竞争力）
+NA_EXEMPT = {
+    "TL": 0.25,  # 仅承受 25% 的 LCS 削弱
+    "C9": 0.30,
+}
+
 POS = ["top", "jng", "mid", "bot", "sup"]
 POS_CN = {"top": "上单", "jng": "打野", "mid": "中单", "bot": "下路", "sup": "辅助"}
 POS_ALIASES = {
@@ -260,6 +301,36 @@ def resolve_team_gid(team_name: str) -> str | None:
             if m == 2:
                 return gid
     return best_gid if best else None
+
+
+def apply_pedigree_radar(radar: dict, delta: float) -> dict:
+    """Small nudge on 0-100 radar values based on Worlds pedigree."""
+    if not radar:
+        return radar
+    out = {}
+    for k, v in radar.items():
+        out[k] = max(25, min(99, int(round(v + delta))))
+    return out
+
+
+def region_adjust(tid: str, region: str) -> tuple[float, float]:
+    """Return (mult, flat) after NA-exempt scaling. Aggressive region bias."""
+    mult = REGION_MULT.get(region, 1.0)
+    flat = REGION_FLAT.get(region, 0.0)
+    if region == "LCS" and tid in NA_EXEMPT:
+        keep = NA_EXEMPT[tid]
+        mult = 1.0 + (mult - 1.0) * keep
+        flat = flat * keep
+    return mult, flat
+
+
+def apply_region_radar(radar: dict, mult: float, flat: float) -> dict:
+    if not radar:
+        return radar
+    out = {}
+    for k, v in radar.items():
+        out[k] = max(25, min(99, int(round(v * mult + flat))))
+    return out
 
 
 def fallback_player_radar(pos: str, seed: int) -> dict:
@@ -477,11 +548,35 @@ def main():
         if not team_radar:
             team_radar = fallback_team_radar(hash(tid) % 97)
 
-        avg_role_score = (sum(scores) / len(scores)) if scores else 1400
-        # map text_score (~1100-1900) into 70-96 band
-        radar_power = round(70 + (avg_role_score - 1100) / 800 * 26, 1)
-        radar_power = max(70.0, min(96.0, radar_power))
-        power = max(70.0, min(96.0, radar_power + (STATIC_POWER[tid] - 85) * 0.15))
+        # 1) 履历 + 赛区系数作用在雷达维度上
+        ped = WORLDS_PEDIGREE.get(tid, 0.0)
+        rmult, rflat = region_adjust(tid, region)
+        if ped:
+            team_radar = apply_pedigree_radar(team_radar, ped)
+            for p in roster:
+                p["radar"] = apply_pedigree_radar(p["radar"], ped * 0.85)
+        team_radar = apply_region_radar(team_radar, rmult, rflat)
+        for p in roster:
+            p["radar"] = apply_region_radar(p["radar"], rmult, rflat * 0.85)
+
+        # 2) 战力以选手/队伍雷达维度均值（0–100）为主源
+        role_means = []
+        for p in roster:
+            rv = p.get("radar") or {}
+            if rv:
+                p["radarPower"] = round(sum(rv.values()) / max(1, len(rv)), 2)
+                role_means.append(p["radarPower"])
+            else:
+                p["radarPower"] = 50.0
+                role_means.append(50.0)
+        role_avg = (sum(role_means) / len(role_means)) if role_means else 50.0
+        team_vals = list((team_radar or {}).values()) or [role_avg]
+        team_avg = sum(team_vals) / len(team_vals)
+        # 五路选手雷达为主，队伍雷达为辅（0–100）
+        radar_power = round(0.62 * role_avg + 0.38 * team_avg, 1)
+        # 雷达均值 → 战力 70–96：50→70，80→89.5，90→96
+        power = 70.0 + (radar_power - 50.0) * 0.65 + (STATIC_POWER[tid] - 85) * 0.12
+        power = max(70.0, min(96.0, power))
 
         teams_out.append({
             "id": tid,
@@ -498,7 +593,11 @@ def main():
             "roster": roster,
             "teamRadar": team_radar,
             "radarPower": radar_power,
-            "avgRoleScore": round(avg_role_score, 1),
+            "roleRadarAvg": round(role_avg, 2),
+            "teamRadarAvg": round(team_avg, 2),
+            "pedigree": ped,
+            "regionMult": rmult,
+            "regionFlat": rflat,
             "dataSource": t_source,
             "season": preferred,
             "rosterSource": "worlds_s16" if tid in desired else "lcs_fill",

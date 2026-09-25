@@ -32,7 +32,7 @@ ok(missing.length === 0, "all game.js ids exist in html or dynamic templates; mi
 
 // data-screen set
 const screens = [...html.matchAll(/data-screen="([A-Za-z0-9_-]+)"/g)].map((m) => m[1]);
-const expectedScreens = ["doc", "pick", "hub", "prep", "battle", "result", "champion"];
+const expectedScreens = ["pick", "hub", "prep", "battle", "result", "champion"];
 for (const s of expectedScreens) {
   ok(screens.includes(s), `screen ${s} present`);
 }
@@ -44,13 +44,13 @@ ok(JSON.stringify(scripts) === JSON.stringify(order), "script load order correct
 
 // dynamic button whitelist
 const dataAttrs = [...game.matchAll(/data-([a-z-]+)=/g)].map((m) => m[1]);
-const allowed = new Set(["team", "nav", "play-match", "sim-match", "sim-rest", "advance", "lineup", "style"]);
+const allowed = new Set(["team", "nav", "play-match", "sim-match", "sim-rest", "redraw", "advance", "lineup", "style"]);
 const unknown = [...new Set(dataAttrs)].filter((a) => !allowed.has(a) && !["screen"].includes(a));
 // data-screen is in html not game; game may reference data-play-match etc via closest
 ok(unknown.length === 0, "dynamic data-* attrs whitelisted; unknown=" + unknown.join(","));
 
 // required buttons in html
-for (const id of ["btnEnter", "btnConfirmPick", "btnToStrategy", "btnBattleNext", "btnResultNext"]) {
+for (const id of ["btnConfirmPick", "btnToStrategy", "btnBattleNext", "btnNextGame", "btnAdjustTactics", "btnResultNext"]) {
   ok(htmlIdSet.has(id), `button ${id} in html`);
 }
 

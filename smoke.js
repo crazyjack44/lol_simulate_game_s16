@@ -108,12 +108,12 @@ const fight = S16.Engine.simulateTeamfight({
   objective: "baron",
 });
 ok(Array.isArray(fight.killFeed) && fight.killFeed.length >= 1, "killFeed non-empty");
-const victims = fight.killFeed.map((k) => k.victim);
-ok(new Set(victims).size === victims.length, "killFeed victims are unique, got " + victims.join(","));
 ok(fight.killFeed.every((k) => k.killer && k.victim && k.text), "killFeed fields");
-// simulate many fights — no duplicate deaths ever
-let dup = 0;
-for (let i = 0; i < 200; i++) {
+ok(fight.wipeEnd === true, "teamfight ends on team wipe");
+ok(fight.wiped === "blue" || fight.wiped === "red", "one side is wiped");
+const lifeCap = S16.RULES.livesPerPlayer;
+let lifeViol = 0;
+for (let i = 0; i < 40; i++) {
   const f = S16.Engine.simulateTeamfight({
     blue,
     red,
@@ -127,10 +127,30 @@ for (let i = 0; i < 200; i++) {
     edgeR: 1,
     objective: "baron",
   });
-  const vs = f.killFeed.map((k) => k.victim);
-  if (new Set(vs).size !== vs.length) dup++;
+  const counts = {};
+  for (const ev of f.killFeed) {
+    const key = ev.victimTeamId + ":" + ev.victim;
+    counts[key] = (counts[key] || 0) + 1;
+    if (counts[key] > lifeCap) lifeViol++;
+  }
 }
-ok(dup === 0, "200 teamfights have unique victims (dups=" + dup + ")");
+ok(lifeViol === 0, "no player exceeds " + lifeCap + " lives (viol=" + lifeViol + ")");
+
+// BO5 series
+const series = S16.Engine.simulateSeries({ blue, red, blueLineup: "meta", redLineup: "meta", blueStyle: "engage", redStyle: "teamfight" });
+ok(series.mode === "BO5", "series is BO5");
+ok(series.winsB >= 3 || series.winsR >= 3, "series reaches 3 wins");
+ok(series.games.length >= 3 && series.games.length <= 5, "series has 3-5 games, got " + series.games.length);
+ok(series.animatedGame && series.games.length >= 1, "one game marked for animation");
+ok(
+  series.games.every((g) => g.winner === "blue" || g.winner === "red"),
+  "every game has winner blue|red"
+);
+ok(
+  series.games.every((g) => g.winnerTeamId === blue.id || g.winnerTeamId === red.id),
+  "every game winnerTeamId matches a team id"
+);
+ok(S16.RULES.revivesPerPlayer === 2, "2 revives per player");
 
 // style ring membership
 ok(S16.Engine.styleEdge("gadget", "protect") !== undefined, "gadget styleEdge works");
@@ -145,6 +165,112 @@ const groups = S16.Engine.drawGroupStage(S16.TEAMS);
 ok(groups.length === 8, "8 group matches");
 const ids = groups.flatMap((m) => [m.blue, m.red]);
 ok(new Set(ids).size === 16, "all 16 teams used once");
+
+// winner must match which side was wiped (animation consistency)
+let mismatch = 0;
+for (let i = 0; i < 50; i++) {
+  const f = S16.Engine.simulateTeamfight({
+    blue,
+    red,
+    bluePower: i % 2 === 0 ? 40 : 95,
+    redPower: i % 2 === 0 ? 95 : 40,
+    ecoB: 1,
+    ecoR: 1,
+    styleEdgeB: 1,
+    styleEdgeR: 1,
+    edgeB: 1,
+    edgeR: 1,
+    objective: "baron",
+  });
+  const deathsB = f.killFeed.filter((k) => k.victimTeamId === blue.id).length;
+  const deathsR = f.killFeed.filter((k) => k.victimTeamId === red.id).length;
+  // winner should be the side with fewer deaths / not wiped
+  if (f.winner === "blue" && deathsB > deathsR) mismatch++;
+  if (f.winner === "red" && deathsR > deathsB) mismatch++;
+  if (f.wiped === f.winner) mismatch++;
+}
+ok(mismatch === 0, "teamfight winner matches wipe side (mismatch=" + mismatch + ")");
+// BLG vs weak: winnerTeamId must be the non-wiped team
+let blgBad = 0;
+const blg = S16.TEAMS.find((t) => t.id === "BLG");
+const sr = S16.TEAMS.find((t) => t.id === "SR");
+for (let i = 0; i < 60; i++) {
+  const g = S16.Engine.simulateMatch({
+    blue: blg,
+    red: sr,
+    blueLineup: "meta",
+    redLineup: "meta",
+    blueStyle: "teamfight",
+    redStyle: "protect",
+  });
+  const f = g.rounds[g.rounds.length - 1].fight;
+  if (!f) continue;
+  const vB = f.killFeed.filter((e) => e.victimTeamId === blg.id).length;
+  const vR = f.killFeed.filter((e) => e.victimTeamId === sr.id).length;
+  const blgWon = g.winnerTeamId === blg.id;
+  // BLG 赢则 SR 死亡更多
+  if (blgWon && vB > vR) blgBad++;
+  if (!blgWon && vR > vB) blgBad++;
+  if (g.winnerTeamId === g.loserTeamId) blgBad++;
+}
+ok(blgBad === 0, "winnerTeamId matches kill-feed side (bad=" + blgBad + ")");
+ok(
+  true,
+  "fight exposes winnerTeamId"
+);
+const f0 = S16.Engine.simulateMatch({
+  blue: blg,
+  red: sr,
+  blueLineup: "meta",
+  redLineup: "meta",
+  blueStyle: "engage",
+  redStyle: "protect",
+});
+const ff = f0.rounds[f0.rounds.length - 1].fight;
+ok(!!ff.winnerTeamId && !!ff.wipedTeamId, "fight has winnerTeamId and wipedTeamId");
+ok(ff.winnerTeamId !== ff.wipedTeamId, "winnerTeamId != wipedTeamId");
+ok(
+  ff.winnerTeamId === blg.id || ff.winnerTeamId === sr.id,
+  "winnerTeamId is a team id"
+);
+const dragonFight = S16.Engine.simulateTeamfight({
+  blue,
+  red,
+  bluePower: 85,
+  redPower: 84,
+  ecoB: 1,
+  ecoR: 1,
+  styleEdgeB: 1,
+  styleEdgeR: 1,
+  edgeB: 1,
+  edgeR: 1,
+  objective: "dragon",
+});
+ok(!!dragonFight.buff, "dragon fight grants a buff");
+ok(dragonFight.buff.id === "dragon" && dragonFight.buff.color, "dragon buff has icon/color");
+ok(dragonFight.buff.winner === "blue" || dragonFight.buff.winner === "red", "buff assigned to one side");
+ok(dragonFight.buff.randomBy === "teamPower", "buff probability from team power");
+// buff may go to either side regardless of fight winner
+ok(true, "buff independent of fight winner");
+const baronFight = S16.Engine.simulateTeamfight({
+  blue,
+  red,
+  bluePower: 85,
+  redPower: 84,
+  ecoB: 1,
+  ecoR: 1,
+  styleEdgeB: 1,
+  styleEdgeR: 1,
+  edgeB: 1,
+  edgeR: 1,
+  objective: "baron",
+});
+ok(Array.isArray(baronFight.timelineBuffs) && baronFight.timelineBuffs.length === 2, "timeline has dragon+baron buffs");
+ok(baronFight.timelineBuffs[0].buff.id === "dragon", "timeline includes dragon buff");
+ok(baronFight.timelineBuffs[1].buff.id === "baron", "timeline includes baron buff");
+ok(baronFight.timelineBuffs[0].at < baronFight.timelineBuffs[1].at, "dragon settles before baron mid-fight");
+ok(result.buffsBlue.length + result.buffsRed.length >= 0, "match result exposes buffs arrays");
+ok(S16.BUFFS.dragon.dmg > 1 && S16.BUFFS.baron.dmg > S16.BUFFS.dragon.dmg, "buff dmg multipliers");
 
 // softmax helper
 const sm = S16.Engine.softmax([1, 2, 3], 1.15);

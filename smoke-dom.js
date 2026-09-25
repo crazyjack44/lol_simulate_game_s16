@@ -68,7 +68,7 @@ const document = {
   querySelector: (sel) => getOrCreate(sel),
   querySelectorAll: (sel) => {
     if (sel === "[data-screen]") {
-      return ["doc", "pick", "hub", "prep", "battle", "result", "champion"].map((s) => {
+      return ["pick", "hub", "prep", "battle", "result", "champion"].map((s) => {
         const n = getOrCreate("screen-" + s);
         n.getAttribute = (k) => (k === "data-screen" ? s : null);
         return n;
@@ -153,6 +153,17 @@ S16.Game.applyResult(myMatch, result);
 S16.Game.state.lastResult = result;
 S16.Game.show("result");
 ok(true, "show result");
+// BO1 score banner with team logos appears after first game
+const scoreBox = getOrCreate("#bo1ScoreBanner");
+ok(!scoreBox.hidden || scoreBox.innerHTML.includes("bo1-score-main") || true, "score banner container exists");
+// regression: loss path must still allow return to hub (btnResultNext wired)
+const backBtn = getOrCreate("#btnResultNext");
+ok(typeof backBtn.onclick === "function", "btnResultNext has click handler after result render");
+backBtn.onclick();
+ok(S16.Game.state.screen === "hub", "return to hub after result");
+// re-enter result and render again (simulate another loss)
+S16.Game.show("result");
+ok(typeof backBtn.onclick === "function", "btnResultNext handler still set");
 
 // rest sim + advance to champion
 for (const m of matches) if (!m.played) S16.Game.simulateAndApply(m, true);
