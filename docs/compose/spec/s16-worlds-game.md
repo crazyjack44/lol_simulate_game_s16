@@ -1,14 +1,22 @@
 ---
 feature: s16-worlds-game
-status: in-progress
+status: delivered
 updated: 2026-09-25
 branch: feature/s16-worlds-game
-commits:
+commits: e33e39d..c2b7909
 ---
 
 # S16 全球总决赛 · 策略对决（网页小游戏）
 
 ## Report
+
+**What was built** — 在 `s16lolgaming` 按 DEVELOPMENT.md 全新重写纯前端 S16 全球总决赛策略对决网页游戏：打开 `index.html` 即可从说明书进入选队（真实 16 队五路名单 + 队伍雷达 + 选手照片/队标），经积分赛→八强→半决赛→决赛→冠军加冕完整赛程。战前仅决策阵容体系（meta/signature/offmeta）与团战风格（四风格克制环）；对局由六因子 softmax 预测事件并程序抽取，触发团战 Canvas 动画与选手 ID 级击杀播报。
+
+数据与素材全部本地化：选手图/队标/英雄图标拷贝至 `assets/`，`scripts/extract_roster.py` 从 lol-radar-titan 最新赛段（LPL Split 3 / LCK Rounds 3-4 / LEC·LCS Summer）生成 `js/roster.js`（T1 五路为 Doran/Oner/Faker/Peyz/Keria）。独立 Review 发现的三项关键问题（红方对阵配置、击杀 feed 重复死亡、`gadget` 风格越界）已修复并复审通过。
+
+**Verification** — `node smoke.js` ALL PASS（含 200 场团战击杀不重复、T1 名单、克制环、概率归一化）；`node check-dom.js` ALL PASS（屏幕/脚本顺序/DOM id）；`node smoke-dom.js` ALL PASS（选队→战前→赛果→冠军全流程 + 素材路径存在）；Node 全届赛事模拟可决出冠军。浏览器视觉与手感未在本环境实机点击验证，属 T9 手工清单残留。
+
+**Journey log** — 1) 真实 S16 名单与指南示例名单不一致，按用户选择以 rosters.json 为准，13 队 + LYON/FLY/SR 补位。2) 首版 roster 匹配把 row 当 id 导致全员 fallback，改为按 season_l1 扫描 + 精确/前缀匹配后对齐。3) Review 指出红方 `startAutoMatch` 接错队伍对象——凡「玩家非蓝方」分支必须同时修正 lineup 与 style 两侧。4) `buildKillFeed` 在 totalKills>5 时必然重复死者，改为一命一人并回写 kills 计数。5) 静态 style `gadget` 不在克制环内会静默失去风格系数，用 `normalizeStyle` 归一到四风格。
 
 ## [S1] Problem
 
@@ -159,12 +167,12 @@ S16.applyRoster()
 
 ## Tasks
 
-- [ ] T1: 素材与数据落盘 — 拷贝选手图/队标/英雄图标/rosters.json 到 `assets/` 与 `data/`，校验尺寸与命名 (covers: S2.4)
-- [ ] T2: roster 抽取脚本 — `scripts/extract_roster.py` 从 season_l1 最新赛段生成 `js/roster.js`，13+3 队、五路与队伍雷达、power 映射 (covers: S2.4)
-- [ ] T3: data.js 静态层 — 真实 16 队配置、LINEUPS/STYLES/PHASES/HERO_SKILLS/NARRATIVE、素材路径、applyRoster (covers: S2.4, S2.5)
-- [ ] T4: radar.js + style.css + index.html 骨架 — 设计 token、七屏 DOM、雷达绘制 API、选手卡/对阵布局 (covers: S2.2, S2.3, S2.5)
-- [ ] T5: engine.js — 预测/模拟/团战/击杀 feed/抽签/自动 AI，导出 §2.6 API (covers: S2.5, S2.6)
-- [ ] T6: anim.js 团战动画 — 单位头像+选手名、弹道粒子、死亡日志、onLog/onDone (covers: S2.2, S2.5)
-- [ ] T7: game.js 流程 — 选队/Hub/战前/回放式观战/赛果/冠军，快速模拟与阶段推进 (covers: S2.5)
-- [ ] T8: smoke.js + check-dom.js — 引擎回归与 DOM 对齐，全部通过 (covers: S2.7)
-- [ ] T9: 端到端验收 — 手工清单走通 + 抽查真实名单/雷达/素材显示 (covers: S2.4, S2.7)
+- [x] T1: 素材与数据落盘 — 拷贝选手图/队标/英雄图标/rosters.json 到 `assets/` 与 `data/`，校验尺寸与命名 (covers: S2.4)
+- [x] T2: roster 抽取脚本 — `scripts/extract_roster.py` 从 season_l1 最新赛段生成 `js/roster.js`，13+3 队、五路与队伍雷达、power 映射 (covers: S2.4)
+- [x] T3: data.js 静态层 — 真实 16 队配置、LINEUPS/STYLES/PHASES/HERO_SKILLS/NARRATIVE、素材路径、applyRoster (covers: S2.4, S2.5)
+- [x] T4: radar.js + style.css + index.html 骨架 — 设计 token、七屏 DOM、雷达绘制 API、选手卡/对阵布局 (covers: S2.2, S2.3, S2.5)
+- [x] T5: engine.js — 预测/模拟/团战/击杀 feed/抽签/自动 AI，导出 §2.6 API (covers: S2.5, S2.6)
+- [x] T6: anim.js 团战动画 — 单位头像+选手名、弹道粒子、死亡日志、onLog/onDone (covers: S2.2, S2.5)
+- [x] T7: game.js 流程 — 选队/Hub/战前/回放式观战/赛果/冠军，快速模拟与阶段推进 (covers: S2.5)
+- [x] T8: smoke.js + check-dom.js — 引擎回归与 DOM 对齐，全部通过 (covers: S2.7)
+- [ ] T9: 端到端验收 — 手工清单走通 + 抽查真实名单/雷达/素材显示 (covers: S2.4, S2.7) — 自动化路径已过；浏览器实机点击清单待人工
