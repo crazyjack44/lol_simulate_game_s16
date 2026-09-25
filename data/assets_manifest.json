@@ -1,0 +1,24 @@
+{
+  "players": 70,
+  "logos": 17,
+  "champions": 173,
+  "logo_map": {
+    "Anyone's Legend": "Anyones_Legend.png",
+    "Bilibili Gaming": "Bilibili_Gaming.png",
+    "Cloud9": "Cloud9.png",
+    "Dplus": "Dplus.png",
+    "G2 Esports": "G2_Esports.png",
+    "Gen.G Esports": "Gen.G_Esports.png",
+    "Hanwha Life Esports": "Hanwha_Life_Esports.png",
+    "Invictus Gaming": "Invictus_Gaming.png",
+    "Karmine Corp": "Karmine_Corp.png",
+    "Movistar KOI": "Movistar_KOI.webp",
+    "T1": "T1.png",
+    "Team Liquid": "Team_Liquid.png",
+    "Top Esports": "Top_Esports.png",
+    "LYON": "LYON.png",
+    "FlyQuest": "FlyQuest.png",
+    "Sentinels": "Sentinels.png",
+    "Dplus Kia": "Dplus_Kia.png"
+  }
+}

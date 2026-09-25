@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>S16 全球总决赛 · 策略对决</title>
+  <meta name="description" content="S16 全球总决赛网页策略小游戏：真实名单雷达 + 程序推演 + 团战观战" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark"></div>
+        <div>
+          <div class="brand-title">S16 · 策略对决</div>
+          <div class="brand-sub">Worlds Strategy Clash</div>
+        </div>
+      </div>
+      <nav class="top-nav">
+        <button class="nav-btn active" data-nav="doc">产品说明书</button>
+        <button class="nav-btn" data-nav="game">进入赛场</button>
+      </nav>
+    </header>
+
+    <!-- ============ doc ============ -->
+    <section data-screen="doc" class="screen active">
+      <div class="hero">
+        <div class="hero-kicker">Product Spec · Web Game</div>
+        <h1>场内策略对决系统</h1>
+        <p class="hero-lead">
+          取材自《英雄联盟电竞经理》场内策略对决的网页简化版。你执教
+          <strong>S16 全球总决赛</strong>16 支真实参赛战队之一，征战积分赛 → 八强 → 半决赛 → 决赛。
+          对局内<strong>不设事件卡</strong>——由程序按概率、战力、经济与风格<strong>叠加推演</strong>并预测下一步事件走向，
+          赛前你只定<strong>阵容体系</strong>与<strong>团战风格</strong>。
+        </p>
+        <div class="hero-actions">
+          <button class="btn btn-primary" id="btnEnter">进入赛场 · 开始 S16</button>
+          <button class="btn btn-ghost" onclick="document.getElementById('spec-core').scrollIntoView({behavior:'smooth'})">阅读系统详解</button>
+        </div>
+      </div>
+
+      <div class="doc-grid" id="spec-core">
+        <article class="doc-card wide">
+          <h2>产品定位 <span class="tag">OVERVIEW</span></h2>
+          <p>
+            纯前端离线可玩：HTML + CSS + 原生 JavaScript。战队战力与选手雷达来自
+            <strong>lol-radar-titan 最新赛段</strong>（LPL Split 3 / LCK Rounds 3-4 / LEC Summer / LCS Summer），
+            选手图、战队 Logo 与英雄图标均已本地化，不依赖 CDN。
+          </p>
+        </article>
+        <article class="doc-card">
+          <h2>核心体验 <span class="tag">CORE</span></h2>
+          <p>赛前决策影响事件概率与战力系数；UI 展示概率条与六因子，对照实际抽取；小龙/大龙团 Canvas 动画；选手 ID 级击杀播报。</p>
+        </article>
+        <article class="doc-card">
+          <h2>相对完整版的简化 <span class="tag">DIFF</span></h2>
+          <p>完整 Ban/Pick → 赛前三选一阵容体系；玩家事件卡取消；装备经济并入系数；六回合沙盘 → 三节点；手动技能 → 程序自动释放。</p>
+        </article>
+        <article class="doc-card">
+          <h2>三层系统 <span class="tag">SYSTEM</span></h2>
+          <p><strong>阵容</strong>：版本常规 / 招牌体系 / 冷门奇招。<br/><strong>推演预测</strong>：phase·style·economy·power·momentum·vs → softmax。<br/><strong>自动团战</strong>：技能时机 + 击杀 feed。</p>
+        </article>
+        <article class="doc-card">
+          <h2>赛事结构 <span class="tag">FORMAT</span></h2>
+          <p>积分赛 8×BO1（胜 3 分）→ 八强 1v8 / 4v5 / 2v7 / 3v6 → 半决赛 → 决赛 → 冠军加冕。</p>
+        </article>
+        <article class="doc-card">
+          <h2>操作指南 <span class="tag">HOW</span></h2>
+          <p>选主队看雷达 → 进入赛场 → 亲自指挥一场（只选阵容+风格）→ 观看推演与团战 → 读赛果复盘 → 可模拟剩余比赛并推进阶段。</p>
+        </article>
+        <article class="doc-card">
+          <h2>数值框架 <span class="tag">MATH</span></h2>
+          <p>power = clamp(70, 96, radarPower + Δ)。克制环：强开→四保一→正面→分带→强开。事件环：入侵→稳健→埋伏；速杀→包抄→蹲伏。</p>
+        </article>
+        <article class="doc-card">
+          <h2>技术实现 <span class="tag">TECH</span></h2>
+          <p>脚本顺序：roster → data → radar → engine → anim → game。校验：node smoke.js / check-dom.js。</p>
+        </article>
+      </div>
+    </section>
+
+    <!-- ============ pick ============ -->
+    <section data-screen="pick" class="screen">
+      <div class="section-title">
+        <h2>选择主队</h2>
+        <p class="muted">真实 S16 名单 · 点击查看雷达与五路</p>
+      </div>
+      <div class="pick-layout">
+        <div class="panel">
+          <div id="teamGrid" class="team-grid"></div>
+          <div class="hub-actions">
+            <button class="btn btn-primary" id="btnConfirmPick">确认开赛</button>
+          </div>
+        </div>
+        <div class="panel">
+          <div id="pickDetail">
+            <p class="muted">选择一支战队，查看真实赛段雷达与五路名单。</p>
+          </div>
+          <div class="radar-split">
+            <canvas id="pickRadar" width="280" height="280"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ hub ============ -->
+    <section data-screen="hub" class="screen">
+      <div class="section-title">
+        <h2>赛场总览 <span class="tag" id="hubStage">积分赛</span></h2>
+        <p class="muted">对阵 · 积分 · 下一步</p>
+      </div>
+      <div class="hub-layout">
+        <div class="panel">
+          <div id="bracket" class="match-grid"></div>
+          <div id="hubActions" class="hub-actions"></div>
+        </div>
+        <div class="panel">
+          <h3>积分榜</h3>
+          <div id="standingsList"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ prep ============ -->
+    <section data-screen="prep" class="screen">
+      <div class="section-title">
+        <h2>战前决策</h2>
+        <p class="muted">阵容体系 + 团战风格（你的唯一决策层）</p>
+      </div>
+      <div id="vsPanel" class="vs-panel"></div>
+      <div class="panel" style="margin-top:14px">
+        <h3>阵容体系</h3>
+        <div id="lineupGrid" class="choice-grid"></div>
+        <h3 style="margin-top:16px">团战风格</h3>
+        <div id="styleGrid" class="choice-grid"></div>
+        <div class="hub-actions">
+          <button class="btn btn-primary" id="btnToStrategy">开始推演观战</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ battle ============ -->
+    <section data-screen="battle" class="screen">
+      <div class="section-title">
+        <h2>对局推演</h2>
+        <p class="muted">预测面板 + 战报 + 团战动画</p>
+      </div>
+      <div class="battle-wrap">
+        <div>
+          <div id="predPanel" class="pred-panel"></div>
+          <div id="phaseNow" class="panel" style="margin-top:12px"></div>
+          <canvas id="battleCanvas" width="640" height="360" style="margin-top:12px"></canvas>
+        </div>
+        <div>
+          <div id="battleLog" class="battle-log"></div>
+          <div class="hub-actions">
+            <button class="btn btn-primary" id="btnBattleNext" disabled>下一步 · 查看赛果</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ result ============ -->
+    <section data-screen="result" class="screen">
+      <div id="resultBanner" class="result-banner"></div>
+      <div class="panel">
+        <h3>赛果数据</h3>
+        <div id="resultStats"></div>
+      </div>
+      <div class="panel" style="margin-top:12px">
+        <h3>复盘</h3>
+        <div id="roundRecap"></div>
+        <div class="hub-actions">
+          <button class="btn btn-primary" id="btnResultNext">返回赛场总览</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ champion ============ -->
+    <section data-screen="champion" class="screen">
+      <div id="championBox"></div>
+    </section>
+  </div>
+
+  <script src="js/roster.js"></script>
+  <script src="js/data.js"></script>
+  <script src="js/radar.js"></script>
+  <script src="js/engine.js"></script>
+  <script src="js/anim.js"></script>
+  <script src="js/game.js"></script>
+</body>
+</html>
