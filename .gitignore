@@ -1,0 +1,9 @@
+﻿# temp / verify artifacts
+_*.png
+_*.html
+_verify*.png
+shot*.png
+
+# copyrighted commercial audio (place locally as assets/audio/rise.ogg)
+assets/audio/rise.ogg
+assets/audio/rise.mp3

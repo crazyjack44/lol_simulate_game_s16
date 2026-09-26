@@ -45,6 +45,14 @@ S16.Game = (() => {
     $all("[data-nav]").forEach((el) => {
       el.classList.toggle("active", el.getAttribute("data-nav") === "game");
     });
+    const order = ["pick", "hub", "prep", "battle", "result", "champion"];
+    const idx = order.indexOf(screen);
+    $all("[data-stage-step]").forEach((el) => {
+      const key = el.getAttribute("data-stage-step");
+      const si = order.indexOf(key);
+      el.classList.toggle("on", key === screen);
+      el.classList.toggle("done", si > -1 && si < idx);
+    });
     if (screen === "pick") renderPick();
     if (screen === "hub") renderHub();
     if (screen === "prep") renderPrep();
@@ -240,6 +248,7 @@ S16.Game = (() => {
       .map(
         (t) => `
       <button class="team-card ${state.myTeamId === t.id ? "selected" : ""}" data-team="${t.id}">
+        ${t.logo ? `<span class="team-card-bg" style="background-image:url('${t.logo}')" aria-hidden="true"></span>` : ""}
         <div class="team-card-top">
           ${t.logo ? `<img class="team-logo" src="${t.logo}" alt="${t.short}" />` : `<span class="team-logo-fallback">${t.short}</span>`}
           <div>
@@ -1254,7 +1263,7 @@ S16.Game = (() => {
       <div class="champion-kicker">S16 WORLD CHAMPION</div>
       ${t.logo ? `<img class="champion-logo" src="${t.logo}" alt="${t.short}" />` : ""}
       <h2>${t.name}</h2>
-      <p class="muted">战力 ${t.power.toFixed(1)} · ${t.region}</p>
+      <p class="muted">${t.region} · 战力 ${t.power.toFixed(1)} · 捧起召唤师杯</p>
       <div class="champion-roster">
         ${t.roster
           .map(
@@ -1409,7 +1418,87 @@ S16.Game = (() => {
     if (S16.applyRoster) S16.applyRoster();
     initTournament();
     bind();
+    initBgm();
     show("pick");
+  }
+
+  function initBgm() {
+    const audio = document.getElementById("bgmAudio");
+    const btn = document.getElementById("bgmToggle");
+    if (!audio || !btn) return;
+
+    // S8 Worlds 主题曲 Rise（本地 QQ 音乐文件）；缺失时回退到免费史诗曲
+    const sources = [
+      { src: "assets/audio/rise.ogg", label: "Rise（S8 Worlds）", primary: true },
+      { src: "assets/audio/rise.mp3", label: "Rise（S8 Worlds）", primary: true },
+      { src: "assets/audio/bgm-epic.mp3", label: "Gathering Darkness", primary: false },
+    ];
+    let srcIdx = 0;
+    let ready = false;
+
+    const setUi = (on, missing) => {
+      btn.classList.toggle("on", !!on);
+      btn.classList.toggle("missing", !!missing);
+      const cur = sources[Math.min(srcIdx, sources.length - 1)];
+      btn.setAttribute("aria-label", on ? "关闭背景音乐" : "开启背景音乐");
+      if (missing) {
+        btn.title = "缺少 assets/audio/rise.ogg，可放入 S8《Rise》原声";
+      } else if (!cur.primary) {
+        btn.title = "背景音乐：Gathering Darkness（放入 rise.ogg 后自动切换为 S8《Rise》）";
+      } else {
+        btn.title = on ? `背景音乐：${cur.label} · 点击关闭` : `背景音乐：${cur.label} · 点击开启`;
+      }
+    };
+
+    const loadSource = () => {
+      const cur = sources[srcIdx];
+      audio.src = cur.src;
+      audio.load();
+    };
+
+    audio.addEventListener("error", () => {
+      if (srcIdx < sources.length - 1) {
+        srcIdx += 1;
+        loadSource();
+        return;
+      }
+      ready = false;
+      setUi(false, true);
+    });
+    audio.addEventListener("canplaythrough", () => {
+      ready = true;
+      setUi(!audio.paused, false);
+    });
+    audio.addEventListener("play", () => setUi(true, false));
+    audio.addEventListener("pause", () => setUi(false, false));
+
+    const tryPlay = () => {
+      audio.volume = 0.42;
+      const p = audio.play();
+      if (p && typeof p.then === "function") {
+        p.then(() => setUi(true, false)).catch(() => setUi(false, !ready));
+      }
+    };
+
+    const unlock = () => {
+      tryPlay();
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+    window.addEventListener("pointerdown", unlock, { once: true });
+    window.addEventListener("keydown", unlock, { once: true });
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (audio.paused) tryPlay();
+      else {
+        audio.pause();
+        setUi(false, false);
+      }
+    });
+
+    loadSource();
+    setUi(false, false);
   }
 
   return { state, bind, show, init, applyResult, advanceStage, simulateAndApply, initTournament };
